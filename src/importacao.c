@@ -1,36 +1,11 @@
-#include <stdint.h>
-#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#else
-#include <sys/stat.h>
-#endif
+#include <direct.h> 
 
-/* Gera os arquivos de dados a partir do CSV do dataset (inserção dos
-   dados iniciais):
-
-   - acessos.dat: um registro por linha importada, com id sequencial. O
-     CSV já está em ordem cronológica, então os ids saem ordenados;
-   - produtos.dat: um registro por product_id distinto, ordenado por
-     ordenação externa (blocos ordenados em memória + intercalação),
-     para não carregar o arquivo inteiro na RAM.
-
-   limite: quantidade de linhas a importar (0 = todas). Com limite, a
-   amostra é sistemática: 1 linha a cada k, com k = total / limite, para
-   cobrir todo o período do CSV e não só as primeiras horas.
-   Os índices e áreas de overflow antigos são apagados. */
-int importar_csv(const char *caminho_csv, int64_t limite,
-                 int64_t *n_acessos, int64_t *n_produtos);
-
-#ifdef _WIN32
-#define criar_pasta(p) _mkdir(p)
-#else
-#define criar_pasta(p) mkdir(p, 0755)
-#endif
+int importar_csv(const char *caminho_csv, long limite,
+                 long *n_acessos, long *n_produtos);
 
 #define TAM_LINHA 1024
 #define TAM_NOME  64
@@ -44,11 +19,9 @@ typedef struct {
     int          proximo_id;
 } ListaRuns;
 
-/* Produto com a ordem em que apareceu no bloco: o qsort não é estável,
-   então o desempate pela ordem garante que fica a primeira ocorrência. */
 typedef struct {
-    Produto  p;
-    uint32_t ordem;
+    Produto p;
+    int     ordem;
 } ProdutoLido;
 
 static int cmp_produto(const void *a, const void *b)
@@ -57,14 +30,14 @@ static int cmp_produto(const void *a, const void *b)
 
     if (x->p.product_id != y->p.product_id)
         return x->p.product_id > y->p.product_id ? 1 : -1;
-    return (x->ordem > y->ordem) - (x->ordem < y->ordem);
+    return x->ordem - y->ordem;
 }
 
 static const char *nova_run(ListaRuns *l)
 {
     if (l->qtd == l->capacidade) {
         int nova = l->capacidade ? l->capacidade * 2 : 16;
-        NomeArquivo *v = realloc(l->nomes, (size_t)nova * sizeof *v);
+        NomeArquivo *v = realloc(l->nomes, nova * sizeof *v);
 
         if (!v)
             return NULL;
@@ -75,13 +48,11 @@ static const char *nova_run(ListaRuns *l)
     return l->nomes[l->qtd++];
 }
 
-/* Ordena o bloco em memória e grava sem product_id repetido (fica a
-   primeira ocorrência de cada produto no bloco). */
-static int gravar_run(ListaRuns *l, ProdutoLido *buf, size_t n)
+static int gravar_run(ListaRuns *l, ProdutoLido *buf, int n)
 {
     const char *nome = nova_run(l);
     FILE *f;
-    size_t i;
+    int i;
 
     if (!nome || !(f = fopen(nome, "wb")))
         return 0;
@@ -93,15 +64,16 @@ static int gravar_run(ListaRuns *l, ProdutoLido *buf, size_t n)
     return 1;
 }
 
-/* Intercala até MAX_VIAS runs ordenadas em uma só, descartando
-   product_id repetidos (fica a primeira ocorrência). Apaga as entradas. */
+/* Intercala ate MAX_VIAS ordenadas em uma so, descartando
+   product_id repetidos (fica a primeira ocorrencia)
+   Tbm apaga os arquivos de entrada */
 static int intercalar(NomeArquivo *entradas, int n, const char *saida)
 {
     FILE *via[MAX_VIAS];
     Produto atual[MAX_VIAS];
     int tem[MAX_VIAS];
     FILE *out = fopen(saida, "wb");
-    uint64_t ultima = 0;
+    long long ultima = 0;
     int gravou = 0, i;
 
     if (!out)
@@ -137,7 +109,7 @@ static int intercalar(NomeArquivo *entradas, int n, const char *saida)
     return 1;
 }
 
-/* Intercala as runs em passadas de até MAX_VIAS arquivos até sobrar uma. */
+// Intercala as runs em passadas de ate MAX_VIAS arquivos ate sobrar uma
 static int ordenacao_externa(ListaRuns *l, const char *destino)
 {
     while (l->qtd > 1) {
@@ -160,7 +132,7 @@ static int ordenacao_externa(ListaRuns *l, const char *destino)
 
     remove(destino);
     if (l->qtd == 0) {
-        FILE *f = fopen(destino, "wb");   /* nenhum produto */
+        FILE *f = fopen(destino, "wb");   // nenhum produto
         if (f)
             fclose(f);
         return f != NULL;
@@ -168,17 +140,17 @@ static int ordenacao_externa(ListaRuns *l, const char *destino)
     return rename(l->nomes[0], destino) == 0;
 }
 
-/* Conta as linhas de dados do CSV (sem o cabeçalho), lendo em blocos. */
-static int64_t contar_linhas(const char *caminho)
+// Conta as linhas de dados do CSV
+static long contar_linhas(const char *caminho)
 {
     FILE *f = fopen(caminho, "rb");
     static char bloco[1 << 16];
-    size_t n, i;
-    int64_t linhas = 0;
+    int n, i;
+    long linhas = 0;
 
     if (!f)
         return 0;
-    while ((n = fread(bloco, 1, sizeof bloco, f)) > 0)
+    while ((n = (int)fread(bloco, 1, sizeof bloco, f)) > 0)
         for (i = 0; i < n; i++)
             if (bloco[i] == '\n')
                 linhas++;
@@ -186,17 +158,17 @@ static int64_t contar_linhas(const char *caminho)
     return linhas > 0 ? linhas - 1 : 0;
 }
 
-int importar_csv(const char *caminho_csv, int64_t limite,
-                 int64_t *n_acessos, int64_t *n_produtos)
+int importar_csv(const char *caminho_csv, long limite,
+                 long *n_acessos, long *n_produtos)
 {
     FILE *csv = fopen(caminho_csv, "r");
     FILE *acessos;
     ProdutoLido *buf;
-    size_t n_buf = 0;
+    int n_buf = 0;
     ListaRuns runs = {NULL, 0, 0, 0};
     char linha[TAM_LINHA];
-    uint64_t id = 0;
-    int64_t total, passo = 1, n_linha;
+    long id = 0;
+    long total, passo = 1, n_linha;
     int ok = 1;
 
     if (!csv) {
@@ -209,10 +181,9 @@ int importar_csv(const char *caminho_csv, int64_t limite,
         total = contar_linhas(caminho_csv);
         if (total > limite)
             passo = total / limite;
-        printf("  %" PRId64 " linhas no CSV: importando 1 a cada %" PRId64 "\n",
-               total, passo);
+        printf("  %ld linhas no CSV: importando 1 a cada %ld\n", total, passo);
     }
-    criar_pasta(DIR_DADOS);   /* falha sem problema se já existe */
+    _mkdir(DIR_DADOS);   // cria a pasta dados/; se ja existe, nao faz nada
     acessos = fopen(ARQ_ACESSOS, "wb");
     buf = malloc(TAM_RUN * sizeof *buf);
     if (!acessos || !buf) {
@@ -224,9 +195,9 @@ int importar_csv(const char *caminho_csv, int64_t limite,
         return 0;
     }
 
-    fgets(linha, sizeof linha, csv);   /* cabeçalho */
+    fgets(linha, sizeof linha, csv);   // cabecalho
 
-    for (n_linha = 0; (limite <= 0 || (int64_t)id < limite)
+    for (n_linha = 0; (limite <= 0 || id < limite)
                       && fgets(linha, sizeof linha, csv); n_linha++) {
         Acesso a;
 
@@ -234,7 +205,7 @@ int importar_csv(const char *caminho_csv, int64_t limite,
             continue;
         if (!csv_converter_linha(linha, id + 1, &a, &buf[n_buf].p))
             continue;
-        buf[n_buf].ordem = (uint32_t)n_buf;
+        buf[n_buf].ordem = n_buf;
         id++;
         fwrite(&a, sizeof a, 1, acessos);
 
@@ -243,7 +214,7 @@ int importar_csv(const char *caminho_csv, int64_t limite,
             n_buf = 0;
         }
         if (id % 100000 == 0)
-            printf("  %" PRIu64 " linhas importadas\n", id);
+            printf("  %ld linhas importadas\n", id);
     }
     if (n_buf > 0)
         ok = ok && gravar_run(&runs, buf, n_buf);
@@ -256,13 +227,13 @@ int importar_csv(const char *caminho_csv, int64_t limite,
     ok = ok && ordenacao_externa(&runs, ARQ_PRODUTOS);
     free(runs.nomes);
 
-    /* índices e overflow antigos não valem mais */
+    // indices e overflow antigos nao valem mais
     remove(ARQ_PRODUTOS_OVERFLOW);
     remove(ARQ_PRODUTOS_INDICE);
     remove(ARQ_ACESSOS_OVERFLOW);
     remove(ARQ_ACESSOS_INDICE);
 
-    *n_acessos = (int64_t)id;
-    *n_produtos = arq_tamanho_bytes(ARQ_PRODUTOS) / (int64_t)sizeof(Produto);
+    *n_acessos = id;
+    *n_produtos = (long)(arq_tamanho_bytes(ARQ_PRODUTOS) / sizeof(Produto));
     return ok;
 }

@@ -30,8 +30,8 @@ campos (ver [src/registros.c](src/registros.c)).
 
 | Campo | Tipo | Bytes | Observação |
 |-------|------|------:|------------|
-| `product_id` | uint64 | 8 | **chave**, sem repetição, ordem crescente |
-| `category_id` | uint64 | 8 | repetido |
+| `product_id` | long long | 8 | **chave**, sem repetição, ordem crescente |
+| `category_id` | long long | 8 | repetido |
 | `category_code` | texto | 40 | repetido (ex.: `electronics.smartphone`) |
 | `brand` | texto | 32 | repetido (a maior marca do dataset tem 32 caracteres) |
 | `price` | float | 4 | |
@@ -48,11 +48,11 @@ vez) descartando os repetidos. Assim o arquivo inteiro nunca fica na RAM.
 
 | Campo | Tipo | Bytes | Observação |
 |-------|------|------:|------------|
-| `id` | uint64 | 8 | **chave** sequencial gerada na importação (1, 2, 3, ...) |
+| `id` | long long | 8 | **chave** sequencial gerada na importação (1, 2, 3, ...) |
 | `event_time` | texto | 19 | `AAAA-MM-DD hh:mm:ss` (UTC) |
 | `event_type` | texto | 16 | repetido: `view`, `cart`, `remove_from_cart`, `purchase` |
-| `product_id` | uint64 | 8 | repetido; referência ao arquivo de produtos |
-| `user_id` | uint64 | 8 | repetido |
+| `product_id` | long long | 8 | repetido; referência ao arquivo de produtos |
+| `user_id` | long long | 8 | repetido |
 | `user_session` | texto | 36 | repetido (UUID da sessão) |
 | `status` | char | 1 | `' '` ativo, `'*'` removido |
 | `fim` | char | 1 | `'\n'` |
@@ -79,7 +79,7 @@ mantida **ordenada** pela chave e limitada a 100 registros.
 ```
 [cabeçalho][nível 1: n1 entradas][nível 2: n2 entradas]
 
-entrada = { chave (uint64), pos (int64) }        16 bytes
+entrada = { chave (long long), pos (long long) }        16 bytes
 ```
 
 - **Nível 1**: uma entrada a cada *B1* registros do arquivo de dados.

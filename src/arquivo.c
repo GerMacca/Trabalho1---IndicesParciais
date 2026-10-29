@@ -1,58 +1,39 @@
 #include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
 #include <string.h>
 
-/* Funções de acesso a registros de tamanho fixo em arquivos binários.
-   Os registros são endereçados pelo número (0, 1, 2, ...); o endereço
-   em bytes é numero * tamanho. */
+int       arq_seek(FILE *f, long long byte);
+long      arq_qtd_registros(FILE *f, int tam);
+int       arq_ler(FILE *f, long n, void *reg, int tam);
+int       arq_gravar(FILE *f, long n, const void *reg, int tam);
+long long arq_tamanho_bytes(const char *caminho);
+int       arq_existe(const char *caminho);
 
-int     arq_seek(FILE *f, int64_t byte);
-int64_t arq_qtd_registros(FILE *f, size_t tam);
-int     arq_ler(FILE *f, int64_t n, void *reg, size_t tam);
-int     arq_gravar(FILE *f, int64_t n, const void *reg, size_t tam);
-int64_t arq_tamanho_bytes(const char *caminho);
-int     arq_existe(const char *caminho);
+void texto_fixo(char *campo, int tam, const char *orig);
 
-/* Copia orig para um campo de texto de tamanho fixo, completando com
-   espaços (o campo não tem '\0'). */
-void texto_fixo(char *campo, size_t tam, const char *orig);
+void texto_ler(char *dest, const char *campo, int tam);
 
-/* Copia um campo de texto fixo para dest (tam + 1 bytes), removendo os
-   espaços do final. */
-void texto_ler(char *dest, const char *campo, size_t tam);
-
-/* Arquivos maiores que 2 GB precisam de seek de 64 bits. */
-#ifdef _WIN32
-#define FSEEK64 _fseeki64
-#define FTELL64 _ftelli64
-#else
-#define FSEEK64 fseeko
-#define FTELL64 ftello
-#endif
-
-int arq_seek(FILE *f, int64_t byte)
+int arq_seek(FILE *f, long long byte)
 {
-    return FSEEK64(f, byte, SEEK_SET) == 0;
+    return _fseeki64(f, byte, SEEK_SET) == 0;
 }
 
-int64_t arq_qtd_registros(FILE *f, size_t tam)
+long arq_qtd_registros(FILE *f, int tam)
 {
-    if (FSEEK64(f, 0, SEEK_END) != 0)
+    if (_fseeki64(f, 0, SEEK_END) != 0)
         return 0;
-    return FTELL64(f) / (int64_t)tam;
+    return (long)(_ftelli64(f) / tam);
 }
 
-int arq_ler(FILE *f, int64_t n, void *reg, size_t tam)
+int arq_ler(FILE *f, long n, void *reg, int tam)
 {
-    if (!arq_seek(f, n * (int64_t)tam))
+    if (!arq_seek(f, (long long)n * tam))
         return 0;
     return fread(reg, tam, 1, f) == 1;
 }
 
-int arq_gravar(FILE *f, int64_t n, const void *reg, size_t tam)
+int arq_gravar(FILE *f, long n, const void *reg, int tam)
 {
-    if (!arq_seek(f, n * (int64_t)tam))
+    if (!arq_seek(f, (long long)n * tam))
         return 0;
     if (fwrite(reg, tam, 1, f) != 1)
         return 0;
@@ -60,14 +41,15 @@ int arq_gravar(FILE *f, int64_t n, const void *reg, size_t tam)
     return 1;
 }
 
-int64_t arq_tamanho_bytes(const char *caminho)
+long long arq_tamanho_bytes(const char *caminho)
 {
     FILE *f = fopen(caminho, "rb");
-    int64_t tam;
+    long long tam = 0;
 
     if (!f)
         return 0;
-    tam = arq_qtd_registros(f, 1);
+    if (_fseeki64(f, 0, SEEK_END) == 0)
+        tam = _ftelli64(f);
     fclose(f);
     return tam;
 }
@@ -82,19 +64,24 @@ int arq_existe(const char *caminho)
     return 1;
 }
 
-void texto_fixo(char *campo, size_t tam, const char *orig)
+void texto_fixo(char *campo, int tam, const char *orig)
 {
-    size_t n = strlen(orig);
+    int i = 0;
 
-    if (n > tam)
-        n = tam;
-    memcpy(campo, orig, n);
-    memset(campo + n, ' ', tam - n);
+    while (i < tam && orig[i] != '\0') {
+        campo[i] = orig[i];
+        i++;
+    }
+    while (i < tam)
+        campo[i++] = ' ';
 }
 
-void texto_ler(char *dest, const char *campo, size_t tam)
+void texto_ler(char *dest, const char *campo, int tam)
 {
-    memcpy(dest, campo, tam);
+    int i;
+
+    for (i = 0; i < tam; i++)
+        dest[i] = campo[i];
     dest[tam] = '\0';
     while (tam > 0 && dest[tam - 1] == ' ')
         dest[--tam] = '\0';
