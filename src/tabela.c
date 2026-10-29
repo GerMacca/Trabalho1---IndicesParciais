@@ -306,13 +306,15 @@ int tabela_remover(Tabela *t, uint64_t chave)
 
 int tabela_reorganizar(Tabela *t)
 {
-    char temp[512];
+    char temp[512], backup[512];
     unsigned char *reg = malloc(t->tam);
     FILE *novo;
     Iterador it;
     int64_t gravados = 0;
+    int ok = 1;
 
     snprintf(temp, sizeof temp, "%s.tmp", t->arq_dados);
+    snprintf(backup, sizeof backup, "%s.bak", t->arq_dados);
     novo = fopen(temp, "wb");
     if (!reg || !novo || !iter_iniciar(&it, t)) {
         free(reg);
@@ -323,18 +325,42 @@ int tabela_reorganizar(Tabela *t)
 
     /* intercalação da área principal com o overflow; o iterador já
        descarta os registros removidos */
-    while (iter_proximo(&it, reg)) {
-        fwrite(reg, t->tam, 1, novo);
+    while (ok && iter_proximo(&it, reg)) {
+        ok = fwrite(reg, t->tam, 1, novo) == 1;
         gravados++;
     }
     iter_fim(&it);
-    fclose(novo);
+    if (fclose(novo) != 0)
+        ok = 0;
     free(reg);
 
+    if (!ok) {
+        /* arquivo novo incompleto (ex.: disco cheio): mantém o original */
+        remove(temp);
+        printf("Erro ao gravar %s: reorganizacao cancelada.\n", temp);
+        return 0;
+    }
+
+    /* troca o arquivo de dados pelo novo sem perder o original se algo
+       falhar: o original vira .bak e só é apagado no final */
     fclose(t->dados);
     fclose(t->overflow);
-    remove(t->arq_dados);
-    rename(temp, t->arq_dados);
+    remove(backup);
+    if (rename(t->arq_dados, backup) != 0) {
+        ok = 0;
+    } else if (rename(temp, t->arq_dados) != 0) {
+        rename(backup, t->arq_dados);   /* devolve o original */
+        ok = 0;
+    }
+    if (!ok) {
+        remove(temp);
+        printf("Erro ao substituir %s: reorganizacao cancelada, "
+               "arquivos originais mantidos.\n", t->arq_dados);
+        t->dados = fopen(t->arq_dados, "r+b");
+        t->overflow = fopen(t->arq_overflow, "r+b");
+        return 0;
+    }
+    remove(backup);
 
     t->dados = fopen(t->arq_dados, "r+b");
     t->overflow = fopen(t->arq_overflow, "w+b");   /* esvazia o overflow */

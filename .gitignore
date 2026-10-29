@@ -8,6 +8,7 @@ ecommerce
 
 # arquivos temporários da importação/reorganização
 dados/*.tmp
+dados/*.bak
 
 # trabalho de referência de outro semestre
 *.zip

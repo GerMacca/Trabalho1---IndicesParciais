@@ -44,12 +44,20 @@ typedef struct {
     int          proximo_id;
 } ListaRuns;
 
+/* Produto com a ordem em que apareceu no bloco: o qsort não é estável,
+   então o desempate pela ordem garante que fica a primeira ocorrência. */
+typedef struct {
+    Produto  p;
+    uint32_t ordem;
+} ProdutoLido;
+
 static int cmp_produto(const void *a, const void *b)
 {
-    uint64_t x = ((const Produto *)a)->product_id;
-    uint64_t y = ((const Produto *)b)->product_id;
+    const ProdutoLido *x = a, *y = b;
 
-    return (x > y) - (x < y);
+    if (x->p.product_id != y->p.product_id)
+        return x->p.product_id > y->p.product_id ? 1 : -1;
+    return (x->ordem > y->ordem) - (x->ordem < y->ordem);
 }
 
 static const char *nova_run(ListaRuns *l)
@@ -67,8 +75,9 @@ static const char *nova_run(ListaRuns *l)
     return l->nomes[l->qtd++];
 }
 
-/* Ordena o bloco em memória e grava sem product_id repetido. */
-static int gravar_run(ListaRuns *l, Produto *buf, size_t n)
+/* Ordena o bloco em memória e grava sem product_id repetido (fica a
+   primeira ocorrência de cada produto no bloco). */
+static int gravar_run(ListaRuns *l, ProdutoLido *buf, size_t n)
 {
     const char *nome = nova_run(l);
     FILE *f;
@@ -78,8 +87,8 @@ static int gravar_run(ListaRuns *l, Produto *buf, size_t n)
         return 0;
     qsort(buf, n, sizeof *buf, cmp_produto);
     for (i = 0; i < n; i++)
-        if (i == 0 || buf[i].product_id != buf[i - 1].product_id)
-            fwrite(&buf[i], sizeof *buf, 1, f);
+        if (i == 0 || buf[i].p.product_id != buf[i - 1].p.product_id)
+            fwrite(&buf[i].p, sizeof(Produto), 1, f);
     fclose(f);
     return 1;
 }
@@ -182,7 +191,7 @@ int importar_csv(const char *caminho_csv, int64_t limite,
 {
     FILE *csv = fopen(caminho_csv, "r");
     FILE *acessos;
-    Produto *buf;
+    ProdutoLido *buf;
     size_t n_buf = 0;
     ListaRuns runs = {NULL, 0, 0, 0};
     char linha[TAM_LINHA];
@@ -223,8 +232,9 @@ int importar_csv(const char *caminho_csv, int64_t limite,
 
         if (n_linha % passo != 0)
             continue;
-        if (!csv_converter_linha(linha, id + 1, &a, &buf[n_buf]))
+        if (!csv_converter_linha(linha, id + 1, &a, &buf[n_buf].p))
             continue;
+        buf[n_buf].ordem = (uint32_t)n_buf;
         id++;
         fwrite(&a, sizeof a, 1, acessos);
 
