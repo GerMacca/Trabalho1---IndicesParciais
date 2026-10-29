@@ -13,13 +13,15 @@
 /* Gera os arquivos de dados a partir do CSV do dataset (inserção dos
    dados iniciais):
 
-   - acessos.dat: um registro por linha do CSV, com id sequencial. O CSV
-     já está em ordem cronológica, então os ids saem ordenados;
+   - acessos.dat: um registro por linha importada, com id sequencial. O
+     CSV já está em ordem cronológica, então os ids saem ordenados;
    - produtos.dat: um registro por product_id distinto, ordenado por
      ordenação externa (blocos ordenados em memória + intercalação),
      para não carregar o arquivo inteiro na RAM.
 
-   limite: quantidade máxima de linhas lidas (0 = todas).
+   limite: quantidade de linhas a importar (0 = todas). Com limite, a
+   amostra é sistemática: 1 linha a cada k, com k = total / limite, para
+   cobrir todo o período do CSV e não só as primeiras horas.
    Os índices e áreas de overflow antigos são apagados. */
 int importar_csv(const char *caminho_csv, int64_t limite,
                  int64_t *n_acessos, int64_t *n_produtos);
@@ -157,6 +159,24 @@ static int ordenacao_externa(ListaRuns *l, const char *destino)
     return rename(l->nomes[0], destino) == 0;
 }
 
+/* Conta as linhas de dados do CSV (sem o cabeçalho), lendo em blocos. */
+static int64_t contar_linhas(const char *caminho)
+{
+    FILE *f = fopen(caminho, "rb");
+    static char bloco[1 << 16];
+    size_t n, i;
+    int64_t linhas = 0;
+
+    if (!f)
+        return 0;
+    while ((n = fread(bloco, 1, sizeof bloco, f)) > 0)
+        for (i = 0; i < n; i++)
+            if (bloco[i] == '\n')
+                linhas++;
+    fclose(f);
+    return linhas > 0 ? linhas - 1 : 0;
+}
+
 int importar_csv(const char *caminho_csv, int64_t limite,
                  int64_t *n_acessos, int64_t *n_produtos)
 {
@@ -167,11 +187,21 @@ int importar_csv(const char *caminho_csv, int64_t limite,
     ListaRuns runs = {NULL, 0, 0, 0};
     char linha[TAM_LINHA];
     uint64_t id = 0;
+    int64_t total, passo = 1, n_linha;
     int ok = 1;
 
     if (!csv) {
         printf("Nao foi possivel abrir %s\n", caminho_csv);
         return 0;
+    }
+
+    if (limite > 0) {
+        printf("  contando as linhas do CSV...\n");
+        total = contar_linhas(caminho_csv);
+        if (total > limite)
+            passo = total / limite;
+        printf("  %" PRId64 " linhas no CSV: importando 1 a cada %" PRId64 "\n",
+               total, passo);
     }
     criar_pasta(DIR_DADOS);   /* falha sem problema se já existe */
     acessos = fopen(ARQ_ACESSOS, "wb");
@@ -187,9 +217,12 @@ int importar_csv(const char *caminho_csv, int64_t limite,
 
     fgets(linha, sizeof linha, csv);   /* cabeçalho */
 
-    while ((limite <= 0 || (int64_t)id < limite) && fgets(linha, sizeof linha, csv)) {
+    for (n_linha = 0; (limite <= 0 || (int64_t)id < limite)
+                      && fgets(linha, sizeof linha, csv); n_linha++) {
         Acesso a;
 
+        if (n_linha % passo != 0)
+            continue;
         if (!csv_converter_linha(linha, id + 1, &a, &buf[n_buf]))
             continue;
         id++;
@@ -200,7 +233,7 @@ int importar_csv(const char *caminho_csv, int64_t limite,
             n_buf = 0;
         }
         if (id % 100000 == 0)
-            printf("  %" PRIu64 " linhas lidas\n", id);
+            printf("  %" PRIu64 " linhas importadas\n", id);
     }
     if (n_buf > 0)
         ok = ok && gravar_run(&runs, buf, n_buf);

@@ -15,7 +15,7 @@
 /* ------------------------------------------------------------------ */
 /* Importação                                                          */
 /* ------------------------------------------------------------------ */
-#define LIMITE_LINHAS_PADRAO 500000  /* linhas do CSV lidas por padrão  */
+#define LIMITE_LINHAS_PADRAO 200000  /* linhas do CSV lidas por padrão  */
 #define TAM_RUN              50000   /* produtos por bloco da ordenação externa */
 #define MAX_VIAS             16      /* arquivos intercalados por vez   */
 

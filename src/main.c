@@ -190,8 +190,8 @@ static int importar(void)
     int64_t limite, n_acessos, n_produtos;
 
     ler_texto("Caminho do CSV (ex.: dados/2019-Oct.csv): ", caminho, sizeof caminho);
-    limite = ler_inteiro("Quantidade de linhas a importar (0 = padrao de "
-                         "500000, -1 = todas): ");
+    limite = ler_inteiro("Quantidade de linhas a importar, espalhadas pelo CSV "
+                         "(0 = padrao de 200000, -1 = todas): ");
     if (limite == 0)
         limite = LIMITE_LINHAS_PADRAO;
 

@@ -60,6 +60,13 @@ vez) descartando os repetidos. Assim o arquivo inteiro nunca fica na RAM.
 Os eventos não têm identificador único no dataset, então a chave é um número
 sequencial. O CSV já vem em ordem cronológica, então os ids saem ordenados.
 
+**Amostra.** O mês de outubro tem cerca de 42 milhões de eventos (4 GB neste
+formato), bem acima do limite de 100 MB por arquivo do GitHub. Por isso o
+arquivo guarda uma **amostra sistemática de 200 mil eventos**. O programa conta
+as linhas do CSV e importa 1 a cada *k* (*k* = total / 200.000, cerca de 212
+para outubro). Assim a amostra cobre o mês inteiro e todas as horas do dia, e
+não só as primeiras horas do dia 1º, como aconteceria lendo as primeiras linhas.
+
 ### Áreas de overflow: `dados/*_overflow.dat`
 
 Cada arquivo de dados tem uma área de overflow com o mesmo formato de registro,
@@ -87,9 +94,11 @@ entrada = { chave (uint64), pos (int64) }        16 bytes
 | produtos | 64 | 32 |
 | acessos | 128 | 64 |
 
-Com 500 mil acessos, o nível 1 tem cerca de 3.900 entradas (62 KB) e o nível 2
-tem 62 entradas (1 KB). Um bloco de dados tem 5,5 KB (produtos) e 12 KB (acessos),
-ou seja, poucas páginas de disco.
+Com 200 mil acessos, o nível 1 tem 1.563 entradas (25 KB, fica no disco) e o
+nível 2 tem 25 entradas (400 bytes, fica na memória). Com o mês de outubro
+inteiro (cerca de 42 milhões de acessos) seriam cerca de 330 mil entradas no
+nível 1 (5 MB) e 5.200 no nível 2 (83 KB). Um bloco de dados tem 5,5 KB (produtos) e
+12 KB (acessos), ou seja, poucas páginas de disco.
 
 **Carga e gravação.** Ao abrir o programa, o cabeçalho e o nível 2 são carregados
 em memória. Se o índice não existe ou não confere com o arquivo de dados, ele é
@@ -138,8 +147,9 @@ No Dev-C++, coloque no projeto apenas o `src/main.c` e salve o `.dev` na raiz.
 
 Também dá para usar `compilar.bat` ou `make`. Na primeira execução o programa
 pede o caminho do CSV (por exemplo `dados/2019-Oct.csv`, baixado do Kaggle) e
-quantas linhas importar. O padrão é 500 mil linhas, cerca de 48 MB de dados, o
-que cabe no limite de 100 MB por arquivo do GitHub. O CSV original não vai para o
+quantas linhas importar. O padrão (`0`) é a amostra de **200 mil linhas**
+espalhadas pelo CSV: o `acessos.dat` fica com cerca de 19 MB. `-1` importa o
+CSV inteiro. O CSV original não vai para o
 repositório (`.gitignore`).
 
 ## Estrutura do código
