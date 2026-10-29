@@ -1,0 +1,13 @@
+# binários de compilação
+*.o
+*.exe
+ecommerce
+
+# CSV original do Kaggle (muito grande para o GitHub)
+*.csv
+
+# arquivos temporários da importação/reorganização
+dados/*.tmp
+
+# trabalho de referência de outro semestre
+*.zip
