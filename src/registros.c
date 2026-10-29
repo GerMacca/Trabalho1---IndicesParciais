@@ -6,7 +6,7 @@
 
 /* Tamanho dos campos de texto (completados com espaços). */
 #define TAM_CATEGORIA 40
-#define TAM_MARCA     24
+#define TAM_MARCA     32   /* maior marca do dataset tem 32 caracteres */
 #define TAM_DATA      19   /* "AAAA-MM-DD hh:mm:ss" */
 #define TAM_EVENTO    16   /* "remove_from_cart" tem 16 caracteres */
 #define TAM_SESSAO    36   /* UUID */
@@ -30,7 +30,7 @@ typedef struct {
     float    price;
     char     status;
     char     fim;                        /* '\n' */
-} Produto;                               /* 86 bytes */
+} Produto;                               /* 94 bytes */
 
 typedef struct {
     uint64_t id;                         /* chave sequencial gerada na importação */
@@ -65,7 +65,7 @@ static const char *ou_traco(const char *s)
 
 void produto_cabecalho(void)
 {
-    printf("  %-20s %-20s %-40s %-24s %10s\n",
+    printf("  %-20s %-20s %-40s %-32s %10s\n",
            "product_id", "category_id", "category_code", "brand", "price");
 }
 
@@ -76,7 +76,7 @@ void produto_imprimir(const void *reg)
 
     texto_ler(categoria, p->category_code, TAM_CATEGORIA);
     texto_ler(marca, p->brand, TAM_MARCA);
-    printf("%c %-20" PRIu64 " %-20" PRIu64 " %-40s %-24s %10.2f\n",
+    printf("%c %-20" PRIu64 " %-20" PRIu64 " %-40s %-32s %10.2f\n",
            p->status, p->product_id, p->category_id,
            ou_traco(categoria), ou_traco(marca), p->price);
 }

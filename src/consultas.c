@@ -149,9 +149,9 @@ void consulta_marcas_mais_compradas(Tabela *produtos, Tabela *acessos, int top)
            total, (unsigned)k, sem_marca);
     printf("Media de leituras por busca no indice: %.1f\n\n",
            (double)leituras_indice / (double)total);
-    printf("%-4s %-24s %10s %8s %14s\n", "#", "marca", "compras", "%", "receita (USD)");
+    printf("%-4s %-32s %10s %8s %14s\n", "#", "marca", "compras", "%", "receita (USD)");
     for (i = 0; i < k && i < (size_t)top; i++)
-        printf("%-4u %-24s %10" PRId64 " %7.2f%% %14.2f\n", (unsigned)(i + 1),
+        printf("%-4u %-32s %10" PRId64 " %7.2f%% %14.2f\n", (unsigned)(i + 1),
                m.v[i].marca, m.v[i].compras,
                100.0 * (double)m.v[i].compras / (double)total, m.v[i].receita);
 

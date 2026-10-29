@@ -26,14 +26,14 @@ de texto são completados com espaços e cada registro termina com `'\n'`. Os
 structs usam `#pragma pack(1)`, então não há bytes de alinhamento entre os
 campos (ver [src/registros.c](src/registros.c)).
 
-### `dados/produtos.dat` – 86 bytes por registro
+### `dados/produtos.dat` – 94 bytes por registro
 
 | Campo | Tipo | Bytes | Observação |
 |-------|------|------:|------------|
 | `product_id` | uint64 | 8 | **chave**, sem repetição, ordem crescente |
 | `category_id` | uint64 | 8 | repetido |
 | `category_code` | texto | 40 | repetido (ex.: `electronics.smartphone`) |
-| `brand` | texto | 24 | repetido |
+| `brand` | texto | 32 | repetido (a maior marca do dataset tem 32 caracteres) |
 | `price` | float | 4 | |
 | `status` | char | 1 | `' '` ativo, `'*'` removido |
 | `fim` | char | 1 | `'\n'` |
@@ -97,7 +97,7 @@ entrada = { chave (uint64), pos (int64) }        16 bytes
 Com 200 mil acessos, o nível 1 tem 1.563 entradas (25 KB, fica no disco) e o
 nível 2 tem 25 entradas (400 bytes, fica na memória). Com o mês de outubro
 inteiro (cerca de 42 milhões de acessos) seriam cerca de 330 mil entradas no
-nível 1 (5 MB) e 5.200 no nível 2 (83 KB). Um bloco de dados tem 5,5 KB (produtos) e
+nível 1 (5 MB) e 5.200 no nível 2 (83 KB). Um bloco de dados tem 6 KB (produtos) e
 12 KB (acessos), ou seja, poucas páginas de disco.
 
 **Carga e gravação.** Ao abrir o programa, o cabeçalho e o nível 2 são carregados
